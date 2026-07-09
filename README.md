@@ -122,14 +122,12 @@ schema/hellnet-stock-updated/v1
 
 ## Configuration
 
-### Apicurio Registry
+### GitHub Secrets (obrigatórios)
 
-Set the following secrets in your GitHub repository:
-
-| Secret | Default | Description |
-|--------|---------|-------------|
-| `APICURIO_URL` | `http://192.168.1.254:8085` | Apicurio Registry endpoint (PVE direto) |
-| `APICURIO_TOKEN` | — | Token de autenticação (se exigido pelo Registry) |
+| Secret | Descrição |
+|--------|-----------|
+| `APICURIO_URL` | Apicurio Registry endpoint (ex: `http://192.168.1.254:8085`) |
+| `APICURIO_TOKEN` | Token de autenticação (se exigido) |
 
 ### Compatibility levels
 
@@ -152,7 +150,7 @@ Set the following secrets in your GitHub repository:
 
 ```bash
 ./scripts/register.sh \
-  --registry http://192.168.1.254:8085 \
+  --registry "\$APICURIO_URL" \
   --group default \
   --schema schemas/avro/hellnet-order-created/v1
 ```
