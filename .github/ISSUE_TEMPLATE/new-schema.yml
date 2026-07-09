@@ -31,7 +31,7 @@ body:
         - BACKWARD
         - FORWARD
         - FULL
-        - NONE
+        - NO_CHECK
       default: 0
 
   - type: textarea

@@ -14,6 +14,8 @@ parse_issue_body() {
   NAME="${NAME:-unknown}"
   TYPE="${TYPE:-avro}"
   COMPAT="${COMPAT:-BACKWARD}"
+  # GitHub issue forms rejects "NONE" keyword, use "NO_CHECK" instead
+  [ "$COMPAT" = "NO_CHECK" ] && COMPAT="NONE"
 }
 
 # Parse YAML field blocks into pipe-separated lines: name|type|default|required
