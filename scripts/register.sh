@@ -7,15 +7,20 @@ set -euo pipefail
 REGISTRY=""
 GROUP="default"
 SCHEMA_DIR=""
+TOKEN="${APICURIO_TOKEN:-}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --registry) REGISTRY="$2"; shift 2 ;;
     --group)    GROUP="$2"; shift 2 ;;
     --schema)   SCHEMA_DIR="$2"; shift 2 ;;
+    --token)    TOKEN="$2"; shift 2 ;;
     *) echo "Unknown: $1"; exit 1 ;;
   esac
 done
+
+AUTH=()
+[ -n "$TOKEN" ] && AUTH=(-H "Authorization: Bearer $TOKEN")
 
 if [ -z "$REGISTRY" ] || [ -z "$SCHEMA_DIR" ]; then
   echo "Usage: $0 --registry <url> --group <group> --schema <dir>"
@@ -57,6 +62,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$REGISTRY/apis/registry/v2/group
   -H "Content-Type: $CONTENT_TYPE" \
   -H "X-Registry-ArtifactId: $ARTIFACT_ID" \
   -H "X-Registry-Name: $NAME" \
+  "${AUTH[@]}" \
   --data-binary "@$FILE")
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -1)
@@ -73,6 +79,7 @@ fi
 # Set compatibility
 curl -s -X PUT "$REGISTRY/apis/registry/v2/groups/$GROUP/artifacts/$ARTIFACT_ID/rules" \
   -H "Content-Type: application/json" \
+  "${AUTH[@]}" \
   -d "{\"config\": \"$COMPAT\", \"ruleType\": \"COMPATIBILITY\"}" > /dev/null
 
 echo "  ✅ Compatibility set: $COMPAT"

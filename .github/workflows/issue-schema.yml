@@ -1,16 +1,23 @@
 name: process-schema-issue
 on:
   issues:
-    types: [opened, edited]
+    types: [opened]    # apenas opened, não edited — evita sobrescrever
 
 permissions:
   contents: write
   issues: write
+  pull-requests: write
 
 jobs:
   generate:
     if: contains(github.event.issue.labels.*.name, 'schema')
     runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.generate.outputs.name }}
+      version: ${{ steps.generate.outputs.version }}
+      path: ${{ steps.generate.outputs.path }}
+      branch: ${{ steps.branch.outputs.name }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,20 +36,36 @@ jobs:
           echo "version=$(echo "$result" | grep '^VERSION=' | cut -d= -f2)" >> $GITHUB_OUTPUT
           echo "path=$(echo "$result" | grep '^PATH=' | cut -d= -f2)" >> $GITHUB_OUTPUT
 
-      - name: Commit generated schema
+      - name: Create branch
+        id: branch
         run: |
+          branch="schema/${{ steps.generate.outputs.name }}-v${{ steps.generate.outputs.version }}"
+          git checkout -b "$branch"
+          git add schemas/
           git config user.name "hellnet-bot"
           git config user.email "bot@hellnet.com.br"
-          git add schemas/
-          git diff --cached --quiet || \
-            git commit -m "feat(schema): ${{ steps.generate.outputs.name }} v${{ steps.generate.outputs.version }}"
-          git tag "schema/${{ steps.generate.outputs.name }}/v${{ steps.generate.outputs.version }}"
-          git push --follow-tags
+          git commit -m "feat(schema): ${{ steps.generate.outputs.name }} v${{ steps.generate.outputs.version }}"
+          git tag --force "schema/${{ steps.generate.outputs.name }}/v${{ steps.generate.outputs.version }}"
+          git push origin "$branch" --follow-tags --force
+          echo "name=$branch" >> $GITHUB_OUTPUT
 
-      - name: Close issue with reference
+      - name: Open PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh pr create \
+            --base main \
+            --head "${{ steps.branch.outputs.name }}" \
+            --title "schema: ${{ steps.generate.outputs.name }} v${{ steps.generate.outputs.version }}" \
+            --body "Schema generated from issue #${{ github.event.issue.number }}" \
+            --label schema \
+            --repo ${{ github.repository }}
+
+      - name: Close issue with PR reference
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_url=$(gh pr list --head "${{ steps.branch.outputs.name }}" --json url -q '.[0].url')
           gh issue close ${{ github.event.issue.number }} \
-            --comment "Schema generated: \`${{ steps.generate.outputs.path }}\`" \
+            --comment "Schema generated in PR: ${pr_url}" \
             --repo ${{ github.repository }}

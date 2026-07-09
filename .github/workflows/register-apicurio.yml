@@ -9,35 +9,55 @@ permissions:
   contents: read
 
 jobs:
-  register:
-    if: github.actor != 'hellnet-bot'
+  find-changed:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        schema: ${{ fromJSON(steps.find-changed.outputs.schemas) }}
+    outputs:
+      schemas: ${{ steps.list.outputs.schemas }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-
-      - name: Find changed schemas
-        id: find-changed
+      - name: List changed schemas
+        id: list
         run: |
-          changed=$(git diff --name-only HEAD~1 HEAD -- 'schemas/**/schema.*' | \
-            sed 's|/schema\..*||' | sort -u | jq -R -s -c 'split("\n")[:-1]')
-          echo "schemas=$changed" >> $GITHUB_OUTPUT
-          echo "Found: $changed"
+          changed=$(git diff --name-only HEAD~1 HEAD -- 'schemas/**/schema.*' || true)
+          if [ -z "$changed" ]; then
+            echo "schemas=[]" >> $GITHUB_OUTPUT
+            echo "No schema changes found"
+          else
+            dirs=$(echo "$changed" | sed 's|/schema\..*||' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+            echo "schemas=$dirs" >> $GITHUB_OUTPUT
+            echo "Changed: $dirs"
+          fi
+
+  register:
+    needs: find-changed
+    if: github.actor != 'hellnet-bot' && fromJSON(needs.find-changed.outputs.schemas) != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        schema: ${{ fromJSON(needs.find-changed.outputs.schemas) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check compatibility
+        env:
+          APICURIO_URL: ${{ secrets.APICURIO_URL || 'http://192.168.1.254:8085' }}
+        run: |
+          chmod +x scripts/check-compatibility.sh
+          ./scripts/check-compatibility.sh \
+            --registry "$APICURIO_URL" \
+            --group "default" \
+            --schema "${{ matrix.schema }}"
 
       - name: Register in Apicurio Registry
         env:
-          APICURIO_URL: ${{ secrets.APICURIO_URL || 'https://schema.hellnet.com.br' }}
+          APICURIO_URL: ${{ secrets.APICURIO_URL || 'http://192.168.1.254:8085' }}
+          APICURIO_TOKEN: ${{ secrets.APICURIO_TOKEN }}
           GROUP_ID: "default"
         run: |
           chmod +x scripts/register.sh
-          for dir in ${{ steps.find-changed.outputs.schemas }}; do
-            echo "Registering $dir..."
-            ./scripts/register.sh \
-              --registry "$APICURIO_URL" \
-              --group "$GROUP_ID" \
-              --schema "$dir"
-          done
+          ./scripts/register.sh \
+            --registry "$APICURIO_URL" \
+            --group "$GROUP_ID" \
+            --schema "${{ matrix.schema }}"

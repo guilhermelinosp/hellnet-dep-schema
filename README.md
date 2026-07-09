@@ -8,6 +8,24 @@ Issue (issuer) → Webhook → Schema versioned in repo → Apicurio Registry
 
 ## How it works
 
+```
+Dev ──abre issue──► Issue Template ──webhook──► Gera schema ──PR──► Review ──merge──► Apicurio Registry
+                        ▲                                                        │
+                        └────────────────── git tag ─────────────────────────────┘
+```
+
+### Fluxo via Issue (webhook)
+
+1. Dev abre issue com template "New Schema"
+2. GitHub Action `process-schema-issue` captura (`issues: opened`)
+3. Script `generate-from-issue.sh` gera o schema no formato escolhido
+4. Action cria branch, commita o schema, e abre um **Pull Request**
+5. Time revisa o PR (diff do schema)
+6. Ao merge na `main`, workflow `register-apicurio`:
+   - Valida compatibilidade com versão anterior
+   - Registra no Apicurio Registry
+   - Cria tag `schema/{nome}/v{versao}`
+
 1. **Dev opens an Issue** using the "New Schema" template
 2. **GitHub Action** captures the issue, generates the schema file, commits and tags
 3. **On merge** to `main`, schema is registered in Apicurio Registry automatically
@@ -110,7 +128,8 @@ Set the following secrets in your GitHub repository:
 
 | Secret | Default | Description |
 |--------|---------|-------------|
-| `APICURIO_URL` | `https://schema.hellnet.com.br` | Apicurio Registry endpoint |
+| `APICURIO_URL` | `http://192.168.1.254:8085` | Apicurio Registry endpoint (PVE direto) |
+| `APICURIO_TOKEN` | — | Token de autenticação (se exigido pelo Registry) |
 
 ### Compatibility levels
 
@@ -133,7 +152,7 @@ Set the following secrets in your GitHub repository:
 
 ```bash
 ./scripts/register.sh \
-  --registry https://schema.hellnet.com.br \
+  --registry http://192.168.1.254:8085 \
   --group default \
   --schema schemas/avro/hellnet-order-created/v1
 ```
