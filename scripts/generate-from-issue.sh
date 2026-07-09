@@ -15,7 +15,9 @@ parse_issue_body() {
   TYPE="${TYPE:-avro}"
   COMPAT="${COMPAT:-BACKWARD}"
   # GitHub issue forms rejects "NONE" keyword, use "NO_CHECK" instead
-  [ "$COMPAT" = "NO_CHECK" ] && COMPAT="NONE"
+  if [ "$COMPAT" = "NO_CHECK" ]; then
+    COMPAT="NONE"
+  fi
 }
 
 # Parse YAML field blocks into pipe-separated lines: name|type|default|required
@@ -167,7 +169,9 @@ SCHEMA_DIR="schemas/${TYPE}/${NAME}"
 # Auto-increment version if dir exists
 if [ -d "$SCHEMA_DIR" ]; then
   last=$(ls -1 "$SCHEMA_DIR" 2>/dev/null | grep -E '^v[0-9]+$' | sort -t'v' -k2 -n | tail -1)
-  [ -n "$last" ] && VERSION=$(( ${last#v} + 1 ))
+  if [ -n "$last" ]; then
+    VERSION=$(( ${last#v} + 1 ))
+  fi
 fi
 
 mkdir -p "$SCHEMA_DIR/v${VERSION}"
