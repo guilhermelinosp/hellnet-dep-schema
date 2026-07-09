@@ -110,7 +110,7 @@ Set the following secrets in your GitHub repository:
 
 | Secret | Default | Description |
 |--------|---------|-------------|
-| `APICURIO_URL` | `http://192.168.1.254:8085` | Apicurio Registry endpoint |
+| `APICURIO_URL` | `https://schema.hellnet.com.br` | Apicurio Registry endpoint |
 
 ### Compatibility levels
 
@@ -133,7 +133,7 @@ Set the following secrets in your GitHub repository:
 
 ```bash
 ./scripts/register.sh \
-  --registry http://192.168.1.254:8085 \
+  --registry https://schema.hellnet.com.br \
   --group default \
   --schema schemas/avro/hellnet-order-created/v1
 ```

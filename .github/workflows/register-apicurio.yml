@@ -30,7 +30,7 @@ jobs:
 
       - name: Register in Apicurio Registry
         env:
-          APICURIO_URL: ${{ secrets.APICURIO_URL || 'http://192.168.1.254:8085' }}
+          APICURIO_URL: ${{ secrets.APICURIO_URL || 'https://schema.hellnet.com.br' }}
           GROUP_ID: "default"
         run: |
           chmod +x scripts/register.sh
