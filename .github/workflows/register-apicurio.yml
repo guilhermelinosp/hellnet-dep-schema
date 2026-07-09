@@ -44,8 +44,9 @@ jobs:
 
       - name: Check compatibility
         env:
-          APICURIO_URL: ${{ secrets.APICURIO_URL || 'http://192.168.1.254:8085' }}
+          APICURIO_URL: ${{ secrets.APICURIO_URL }}
         run: |
+          [ -z "$APICURIO_URL" ] && { echo "❌ APICURIO_URL secret not set"; exit 1; }
           chmod +x scripts/check-compatibility.sh
           ./scripts/check-compatibility.sh \
             --registry "$APICURIO_URL" \
@@ -54,10 +55,11 @@ jobs:
 
       - name: Register in Apicurio Registry
         env:
-          APICURIO_URL: ${{ secrets.APICURIO_URL || 'http://192.168.1.254:8085' }}
+          APICURIO_URL: ${{ secrets.APICURIO_URL }}
           APICURIO_TOKEN: ${{ secrets.APICURIO_TOKEN }}
           GROUP_ID: "default"
         run: |
+          [ -z "$APICURIO_URL" ] && { echo "❌ APICURIO_URL secret not set"; exit 1; }
           chmod +x scripts/register.sh
           ./scripts/register.sh \
             --registry "$APICURIO_URL" \
