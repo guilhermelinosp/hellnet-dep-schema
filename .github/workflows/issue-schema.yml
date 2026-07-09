@@ -1,5 +1,6 @@
 name: process-schema-issue
 on:
+  workflow_dispatch:
   issues:
     types: [opened]    # apenas opened, não edited — evita sobrescrever
 
