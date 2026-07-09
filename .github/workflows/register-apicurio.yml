@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   find-changed:
-    runs-on: ubuntu-latest
+    runs-on: arc-runner
     outputs:
       schemas: ${{ steps.list.outputs.schemas }}
     steps:
@@ -35,7 +35,7 @@ jobs:
   register:
     needs: find-changed
     if: github.actor != 'hellnet-bot' && needs.find-changed.outputs.has_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: arc-runner
     strategy:
       matrix:
         schema: ${{ fromJSON(needs.find-changed.outputs.schemas) }}
