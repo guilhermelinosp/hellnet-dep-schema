@@ -1,30 +1,171 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ISSUE_BODY="$1"
+# === Helpers ===
 
-# ---- Parse fields from GitHub issue body ----
-# The body contains YAML frontmatter with name, type, compatibility, and fields
+# Parse issue body fields from GitHub issue template
+parse_issue_body() {
+  local body="$1"
+  NAME=$(echo "$body" | sed -n '/### Schema name/{n;p;}' | xargs)
+  TYPE=$(echo "$body" | sed -n '/### Format/{n;p;}' | xargs)
+  COMPAT=$(echo "$body" | sed -n '/### Compatibility/{n;p;}' | xargs)
+  FIELDS=$(echo "$body" | sed -n '/### Fields/,/### [A-Z]/p' | sed '1d;$d' | grep -v '^$')
 
-NAME=$(echo "$ISSUE_BODY" | grep -A1 '### Schema name' | tail -1 | xargs)
-TYPE=$(echo "$ISSUE_BODY" | grep -A1 '### Format' | tail -1 | xargs)
-COMPAT=$(echo "$ISSUE_BODY" | grep -A1 '### Compatibility' | tail -1 | xargs)
-FIELDS=$(echo "$ISSUE_BODY" | sed -n '/### Fields/,/### Description/p' | sed '1d;$d')
+  NAME="${NAME:-unknown}"
+  TYPE="${TYPE:-avro}"
+  COMPAT="${COMPAT:-BACKWARD}"
+}
 
-# Sanitize
-NAME="${NAME:-unknown}"
-TYPE="${TYPE:-avro}"
-COMPAT="${COMPAT:-BACKWARD}"
+# Parse YAML field blocks into pipe-separated lines: name|type|default|required
+parse_fields() {
+  echo "$1" | awk '
+    BEGIN { f=""; t=""; d=""; r=""; sep="|" }
+    /^- / {
+      if (f != "") print f sep t sep d sep r
+      f=substr($0, index($0,": ")+2)
+      t=""; d=""; r=""
+    }
+    /^  type:/     { t=substr($0, index($0,": ")+2) }
+    /^  default:/  { d=substr($0, index($0,": ")+2) }
+    /^  required:/ { r=substr($0, index($0,": ")+2) }
+    END { if (f != "") print f sep t sep d sep r }
+  '
+}
+
+# Validate JSON file
+validate_json_file() {
+  python3 -c "import json; json.load(open('$1'))" 2>/dev/null || {
+    echo "ERROR: Invalid JSON in $1"
+    exit 1
+  }
+}
+
+# === Generator: Avro ===
+
+generate_avro() {
+  local name="$1" fields="$2" output="$3"
+  local avro_name
+  avro_name=$(echo "$name" | tr '-' '_' | sed 's/[^a-zA-Z0-9_]/_/g')
+
+  exec 3>"$output"
+  echo '{' >&3
+  echo '  "namespace": "hellnet.events",' >&3
+  echo '  "type": "record",' >&3
+  echo "  \"name\": \"$avro_name\"," >&3
+  echo '  "doc": "Auto-generated from hellnet-dep-schema",' >&3
+  echo '  "fields": [' >&3
+
+  local first=true
+  while IFS='|' read -r fname ftype fdefault frequired; do
+    [ -z "$fname" ] || [ -z "$ftype" ] && continue
+
+    [ "$first" = false ] && echo "," >&3
+    first=false
+
+    echo -n '    { "name": "'"$fname"'", "type": ' >&3
+    if [ "$frequired" = "false" ] || [ -n "$fdefault" ]; then
+      echo -n '["null", "'"$ftype"'"]' >&3
+    else
+      echo -n '"'"$ftype"'"' >&3
+    fi
+    [ -n "$fdefault" ] && echo -n ', "default": '"$fdefault" >&3
+    echo -n ' }' >&3
+  done < <(parse_fields "$fields")
+
+  echo '' >&3
+  echo '  ]' >&3
+  echo '}' >&3
+  exec 3>&-
+
+  validate_json_file "$output"
+}
+
+# === Generator: JSON Schema ===
+
+generate_json() {
+  local name="$1" fields="$2" output="$3"
+  local title
+  title=$(echo "$name" | tr '-' ' ' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1')
+
+  exec 3>"$output"
+  echo '{' >&3
+  echo '  "$schema": "http://json-schema.org/draft-07/schema#",' >&3
+  echo "  \"title\": \"$title\"," >&3
+  echo '  "type": "object",' >&3
+  echo '  "properties": {' >&3
+
+  local first=true
+  while IFS='|' read -r fname ftype fdefault frequired; do
+    [ -z "$fname" ] && continue
+    [ "$first" = false ] && echo "," >&3
+    first=false
+    echo -n "    \"$fname\": { \"type\": \"$ftype\" }" >&3
+  done < <(parse_fields "$fields")
+
+  echo '' >&3
+  echo '  },' >&3
+  echo '  "required": [' >&3
+
+  local first=true
+  while IFS='|' read -r fname ftype fdefault frequired; do
+    [ -z "$fname" ] && continue
+    if [ "$frequired" != "false" ]; then
+      [ "$first" = false ] && echo "," >&3
+      first=false
+      echo -n "    \"$fname\"" >&3
+    fi
+  done < <(parse_fields "$fields")
+
+  echo '' >&3
+  echo '  ]' >&3
+  echo '}' >&3
+  exec 3>&-
+
+  validate_json_file "$output"
+}
+
+# === Generator: Protobuf ===
+
+generate_protobuf() {
+  local name="$1" fields="$2" output="$3"
+  local msg_name
+  msg_name=$(echo "$name" | awk -F'-' '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1' | tr -d ' ')
+
+  exec 3>"$output"
+  echo 'syntax = "proto3";' >&3
+  echo 'package hellnet.events.v1;' >&3
+  echo '' >&3
+  echo 'option csharp_namespace = "Hellnet.Events.V1";' >&3
+  echo '' >&3
+  echo "message $msg_name {" >&3
+
+  local idx=0
+  while IFS='|' read -r fname ftype fdefault frequired; do
+    [ -z "$fname" ] && continue
+    idx=$((idx + 1))
+    echo "  $ftype $fname = $idx;" >&3
+  done < <(parse_fields "$fields")
+
+  echo '}' >&3
+  exec 3>&-
+
+  if ! grep -q 'syntax = "proto3"' "$output"; then
+    echo "ERROR: Invalid protobuf schema generated"
+    exit 1
+  fi
+}
+
+# === Main ===
+
+parse_issue_body "${1:-}"
 
 VERSION=1
-
-# Check for existing versions
 SCHEMA_DIR="schemas/${TYPE}/${NAME}"
+
+# Auto-increment version if dir exists
 if [ -d "$SCHEMA_DIR" ]; then
-  LAST_VERSION=$(ls -1 "$SCHEMA_DIR" | grep -E '^v[0-9]+$' | sort -t'v' -k2 -n | tail -1)
-  if [ -n "$LAST_VERSION" ]; then
-    VERSION=$(( ${LAST_VERSION#v} + 1 ))
-  fi
+  last=$(ls -1 "$SCHEMA_DIR" 2>/dev/null | grep -E '^v[0-9]+$' | sort -t'v' -k2 -n | tail -1)
+  [ -n "$last" ] && VERSION=$(( ${last#v} + 1 ))
 fi
 
 mkdir -p "$SCHEMA_DIR/v${VERSION}"
@@ -39,10 +180,14 @@ case "$TYPE" in
   protobuf)
     generate_protobuf "$NAME" "$FIELDS" "$SCHEMA_DIR/v${VERSION}/schema.proto"
     ;;
+  *)
+    echo "ERROR: unknown type: $TYPE"
+    exit 1
+    ;;
 esac
 
-# Write compatibility config
-cat > "$SCHEMA_DIR/v${VERSION}/.meta.json" << EOF
+# Write metadata
+cat > "$SCHEMA_DIR/v${VERSION}/.meta.json" << META
 {
   "name": "$NAME",
   "type": "$TYPE",
@@ -50,191 +195,12 @@ cat > "$SCHEMA_DIR/v${VERSION}/.meta.json" << EOF
   "compatibility": "$COMPAT",
   "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
-EOF
+META
 
 echo "NAME=$NAME"
 echo "TYPE=$TYPE"
 echo "VERSION=$VERSION"
-echo "PATH=${SCHEMA_DIR}/v${VERSION}/schema.${TYPE}"
-
-# ---- Generator functions ----
-
-generate_avro() {
-  local name="$1"
-  local fields_yaml="$2"
-  local output="$3"
-
-  cat > "$output" << AVRO_EOF
-{
-  "namespace": "hellnet.events",
-  "type": "record",
-  "name": "$(echo "$name" | sed 's/-/_/g' | sed 's/[^a-zA-Z0-9_]/_/g')",
-  "doc": "Auto-generated from hellnet-dep-schema",
-  "fields": [
-AVRO_EOF
-
-  # Parse fields from YAML and generate Avro field entries
-  echo "$fields_yaml" | while IFS= read -r line; do
-    local field_type=$(echo "$line" | grep -oP 'type:\s*\K\S+' || true)
-    local field_name=$(echo "$line" | grep -oP 'name:\s*\K\S+' || true)
-    local field_default=$(echo "$line" | grep -oP 'default:\s*\K\S+' || true)
-    local field_required=$(echo "$line" | grep -oP 'required:\s*\K\S+' || true)
-
-    if [ -z "$field_name" ] || [ -z "$field_type" ]; then
-      continue
-    fi
-
-    # Map YAML types to Avro types
-    case "$field_type" in
-      string) avro_type="string" ;;
-      int)    avro_type="int" ;;
-      long)   avro_type="long" ;;
-      double) avro_type="double" ;;
-      float)  avro_type="float" ;;
-      bool)   avro_type="boolean" ;;
-      array)  avro_type="array" ;;
-      object) avro_type="record" ;;
-      *)      avro_type="string" ;;
-    esac
-
-    # Build Avro field
-    echo -n '    { "name": "'"$field_name"'", "type": '
-    if [ "$field_required" = "false" ] || [ -n "$field_default" ]; then
-      echo -n '["null", "'"$avro_type"'"]'
-    else
-      echo -n '"'"$avro_type"'"'
-    fi
-
-    if [ -n "$field_default" ]; then
-      echo -n ', "default": '"$field_default"
-    fi
-
-    echo ' }'
-  done | paste -sd ',' - >> "$output"
-
-  echo '  ]' >> "$output"
-  echo '}' >> "$output"
-
-  # Validate with python
-  python3 -c "import json; json.load(open('$output'))" || {
-    echo "ERROR: Invalid Avro schema generated"
-    exit 1
-  }
-}
-
-generate_json() {
-  local name="$1"
-  local fields_yaml="$2"
-  local output="$3"
-
-  cat > "$output" << JSON_EOF
-{
-  "\$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "$(echo "$name" | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')",
-  "type": "object",
-  "properties": {
-JSON_EOF
-
-  echo "$fields_yaml" | while IFS= read -r line; do
-    local field_name=$(echo "$line" | grep -oP 'name:\s*\K\S+' || true)
-    local field_type=$(echo "$line" | grep -oP 'type:\s*\K\S+' || true)
-    local field_desc=$(echo "$line" | grep -oP 'description:\s*\K.*' || true)
-    local field_required=$(echo "$line" | grep -oP 'required:\s*\K\S+' || true)
-
-    if [ -z "$field_name" ] || [ -z "$field_type" ]; then
-      continue
-    fi
-
-    case "$field_type" in
-      string) js_type="string" ;;
-      int|long) js_type="integer" ;;
-      double|float) js_type="number" ;;
-      bool)   js_type="boolean" ;;
-      array)  js_type="array" ;;
-      object) js_type="object" ;;
-      *)      js_type="string" ;;
-    esac
-
-    echo -n '    "'"$field_name"'": { "type": "'"$js_type"'"'
-    if [ -n "$field_desc" ]; then
-      echo -n ', "description": "'"$field_desc"'"'
-    fi
-    echo ' }'
-  done | paste -sd ',' - >> "$output"
-
-  echo '  },' >> "$output"
-
-  # Required fields
-  echo -n '  "required": [' >> "$output"
-  first=true
-  echo "$fields_yaml" | while IFS= read -r line; do
-    local field_name=$(echo "$line" | grep -oP 'name:\s*\K\S+' || true)
-    local field_required=$(echo "$line" | grep -oP 'required:\s*\K\S+' || true)
-    if [ -n "$field_name" ] && { [ "$field_required" = "true" ] || [ -z "$field_required" ]; }; then
-      if [ "$first" = true ]; then
-        first=false
-      else
-        echo -n ', '
-      fi
-      echo -n '"'"$field_name"'"'
-    fi
-  done >> "$output"
-  echo ']' >> "$output"
-  echo '}' >> "$output"
-
-  # Validate JSON
-  python3 -c "import json; json.load(open('$output'))" || {
-    echo "ERROR: Invalid JSON Schema generated"
-    exit 1
-  }
-}
-
-generate_protobuf() {
-  local name="$1"
-  local fields_yaml="$2"
-  local output="$3"
-
-  local proto_name=$(echo "$name" | sed 's/-/_/g' | sed 's/[^a-zA-Z0-9_]//g')
-  local package="hellnet.events.v1"
-
-  cat > "$output" << PROTO_EOF
-syntax = "proto3";
-package $package;
-
-option csharp_namespace = "Hellnet.Events.V1";
-
-message $(echo "$name" | sed 's/-//g' | sed 's/^./\u&/;s/-\(.\)/\u\1/g') {
-PROTO_EOF
-
-  local idx=0
-  echo "$fields_yaml" | while IFS= read -r line; do
-    local field_name=$(echo "$line" | grep -oP 'name:\s*\K\S+' || true)
-    local field_type=$(echo "$line" | grep -oP 'type:\s*\K\S+' || true)
-
-    if [ -z "$field_name" ] || [ -z "$field_type" ]; then
-      continue
-    fi
-
-    case "$field_type" in
-      string) pb_type="string" ;;
-      int)    pb_type="int32" ;;
-      long)   pb_type="int64" ;;
-      double) pb_type="double" ;;
-      float)  pb_type="float" ;;
-      bool)   pb_type="bool" ;;
-      array)  pb_type="repeated string" ;;
-      *)      pb_type="string" ;;
-    esac
-
-    idx=$((idx + 1))
-    echo "  $pb_type $field_name = $idx;"
-  done >> "$output"
-
-  echo '}' >> "$output"
-
-  # Basic validation
-  if ! grep -q 'syntax = "proto3"' "$output"; then
-    echo "ERROR: Invalid protobuf schema generated"
-    exit 1
-  fi
-}
+EXT="avsc"
+[ "$TYPE" = "json" ] && EXT="json"
+[ "$TYPE" = "protobuf" ] && EXT="proto"
+echo "PATH=${SCHEMA_DIR}/v${VERSION}/schema.${EXT}"
