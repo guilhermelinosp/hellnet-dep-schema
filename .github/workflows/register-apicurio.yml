@@ -22,17 +22,18 @@ jobs:
         run: |
           changed=$(git diff --name-only HEAD~1 HEAD -- 'schemas/**/schema.*' || true)
           if [ -z "$changed" ]; then
-            echo "schemas=[]" >> $GITHUB_OUTPUT
+            echo "has_changed=false" >> $GITHUB_OUTPUT
             echo "No schema changes found"
           else
             dirs=$(echo "$changed" | sed 's|/schema\..*||' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+            echo "has_changed=true" >> $GITHUB_OUTPUT
             echo "schemas=$dirs" >> $GITHUB_OUTPUT
             echo "Changed: $dirs"
           fi
 
   register:
     needs: find-changed
-    if: github.actor != 'hellnet-bot' && fromJSON(needs.find-changed.outputs.schemas) != ''
+    if: github.actor != 'hellnet-bot' && needs.find-changed.outputs.has_changed == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
