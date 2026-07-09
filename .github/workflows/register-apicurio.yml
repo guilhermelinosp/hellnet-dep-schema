@@ -1,0 +1,43 @@
+name: register-apicurio
+on:
+  push:
+    branches: [main]
+    paths:
+      - "schemas/**"
+
+permissions:
+  contents: read
+
+jobs:
+  register:
+    if: github.actor != 'hellnet-bot'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        schema: ${{ fromJSON(steps.find-changed.outputs.schemas) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Find changed schemas
+        id: find-changed
+        run: |
+          changed=$(git diff --name-only HEAD~1 HEAD -- 'schemas/**/schema.*' | \
+            sed 's|/schema\..*||' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          echo "schemas=$changed" >> $GITHUB_OUTPUT
+          echo "Found: $changed"
+
+      - name: Register in Apicurio Registry
+        env:
+          APICURIO_URL: ${{ secrets.APICURIO_URL || 'http://192.168.1.254:8085' }}
+          GROUP_ID: "default"
+        run: |
+          chmod +x scripts/register.sh
+          for dir in ${{ steps.find-changed.outputs.schemas }}; do
+            echo "Registering $dir..."
+            ./scripts/register.sh \
+              --registry "$APICURIO_URL" \
+              --group "$GROUP_ID" \
+              --schema "$dir"
+          done
