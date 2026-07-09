@@ -1,0 +1,25 @@
+output: false
+pre-commit:
+  commands:
+    format:
+      glob: "{**/*.cs,**/*.yaml,**/*.yml,**/*.json,**/*.xml}"
+      exclude:
+        - "**/bin/**"
+        - "**/obj/**"
+        - "**/node_modules/**"
+      run: |
+        SOLN=$(ls *.sln *.slnx 2>/dev/null | head -1)
+        if [ -n "$SOLN" ]; then dotnet format "$SOLN" --verbosity quiet --no-restore 2>/dev/null; fi
+    build:
+      run: |
+        SOLN=$(ls *.sln *.slnx app/*.sln app/*.slnx 2>/dev/null | head -1)
+        if [ -n "$SOLN" ]; then dotnet build "$SOLN" -c release --nologo 2>/dev/null; fi
+    coverage:
+      run: |
+        SOLN=$(ls *.sln *.slnx app/*.sln app/*.slnx 2>/dev/null | head -1)
+        if [ -n "$SOLN" ]; then dotnet test "$SOLN" -c release --nologo --verbosity quiet /p:CollectCoverage=true /p:Threshold=90 /p:ThresholdType=line /p:ThresholdStat=total 2>/dev/null; fi
+commit-msg:
+  commands:
+    conventional:
+      run: |
+        grep -Eq '^(feat|fix|docs|style|ref|perf|test|ci|chore|rev)(\(.+\))?!?: .+' {1}
