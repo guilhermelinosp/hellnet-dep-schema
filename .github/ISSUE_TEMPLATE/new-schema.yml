@@ -1,0 +1,64 @@
+name: "New Schema"
+description: "Request creation of a new event schema"
+title: "schema: [name] v1"
+labels: [schema]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: "Schema name"
+      description: "Convention: hellnet-{domain}-{event}"
+      placeholder: "hellnet-order-created"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Format"
+      options:
+        - avro
+        - json
+        - protobuf
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: "Compatibility level"
+      options:
+        - BACKWARD
+        - FORWARD
+        - FULL
+        - NONE
+      default: 0
+
+  - type: textarea
+    id: fields
+    attributes:
+      label: "Fields (YAML)"
+      description: |
+        Define fields in YAML format:
+        ```yaml
+        - name: orderId
+          type: string
+          required: true
+        - name: amount
+          type: double
+          required: true
+        - name: currency
+          type: string
+          default: "BRL"
+        ```
+      placeholder: "- name: orderId\n  type: string\n  required: true"
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description (optional)"
+      description: "Purpose of this event"
+      placeholder: "Emitted when an order is created"

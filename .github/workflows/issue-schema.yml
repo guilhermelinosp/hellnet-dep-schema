@@ -1,0 +1,48 @@
+name: process-schema-issue
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  generate:
+    if: contains(github.event.issue.labels.*.name, 'schema')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Parse issue and generate schema
+        id: generate
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          chmod +x scripts/generate-from-issue.sh
+          result=$(./scripts/generate-from-issue.sh "$ISSUE_BODY")
+          echo "$result"
+          echo "name=$(echo "$result" | grep '^NAME=' | cut -d= -f2)" >> $GITHUB_OUTPUT
+          echo "type=$(echo "$result" | grep '^TYPE=' | cut -d= -f2)" >> $GITHUB_OUTPUT
+          echo "version=$(echo "$result" | grep '^VERSION=' | cut -d= -f2)" >> $GITHUB_OUTPUT
+          echo "path=$(echo "$result" | grep '^PATH=' | cut -d= -f2)" >> $GITHUB_OUTPUT
+
+      - name: Commit generated schema
+        run: |
+          git config user.name "hellnet-bot"
+          git config user.email "bot@hellnet.com.br"
+          git add schemas/
+          git diff --cached --quiet || \
+            git commit -m "feat(schema): ${{ steps.generate.outputs.name }} v${{ steps.generate.outputs.version }}"
+          git tag "schema/${{ steps.generate.outputs.name }}/v${{ steps.generate.outputs.version }}"
+          git push --follow-tags
+
+      - name: Close issue with reference
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue close ${{ github.event.issue.number }} \
+            --comment "Schema generated: \`${{ steps.generate.outputs.path }}\`" \
+            --repo ${{ github.repository }}
