@@ -12,7 +12,7 @@ permissions:
 jobs:
   generate:
     if: contains(github.event.issue.labels.*.name, 'schema')
-    runs-on: arc-runner
+    runs-on: ubuntu-latest
     outputs:
       name: ${{ steps.generate.outputs.name }}
       version: ${{ steps.generate.outputs.version }}
