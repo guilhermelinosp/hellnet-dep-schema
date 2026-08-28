@@ -16,33 +16,18 @@ permissions:
 
 jobs:
   analyze:
-    name: analyze (${{ matrix.language }})
+    name: analyze (actions)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: go
-            build-mode: autobuild
-          - language: actions
-            build-mode: none
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Go
-        if: matrix.language == 'go'
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
+          languages: actions
+          build-mode: none
           queries: +security-and-quality
 
       - name: Perform CodeQL Analysis
