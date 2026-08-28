@@ -163,6 +163,19 @@ generate_protobuf() {
 
 parse_issue_body "${1:-}"
 
+# === Security: strictly validate untrusted inputs from the issue body ===
+# NAME/TYPE come from the issue body and are later used in shell commands
+# (branch name, tag, commit message, PR title). Restrict to a safe allowlist
+# to prevent command injection in the workflow steps that consume them.
+if ! echo "$NAME" | grep -qE '^[A-Za-z0-9_-]+$'; then
+  echo "ERROR: invalid schema name (allowed: [A-Za-z0-9_-]): $NAME"
+  exit 1
+fi
+case "$TYPE" in
+  avro|json|protobuf) ;;
+  *) echo "ERROR: invalid schema type (allowed: avro|json|protobuf): $TYPE"; exit 1 ;;
+esac
+
 VERSION=1
 SCHEMA_DIR="schemas/${TYPE}/${NAME}"
 
