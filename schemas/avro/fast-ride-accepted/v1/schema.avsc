@@ -1,0 +1,13 @@
+{
+  "namespace": "hellnet.events",
+  "type": "record",
+  "name": "fast_ride_accepted",
+  "doc": "Auto-generated from hellnet-dep-schema",
+  "fields": [
+    { "name": "eventId", "type": "string" },
+    { "name": "eventVersion", "type": "int", "default": 1 },
+    { "name": "occurredAt", "type": "long" },
+    { "name": "rideId", "type": "string" },
+    { "name": "driverId", "type": "string" }
+  ]
+}
