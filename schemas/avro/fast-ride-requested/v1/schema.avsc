@@ -1,8 +1,8 @@
 {
-  "namespace": "hellnet.events",
+  "namespace": "fast.events.ride.v1",
   "type": "record",
-  "name": "fast_ride_requested",
-  "doc": "Auto-generated from hellnet-dep-schema",
+  "name": "RideRequestedV1",
+  "doc": "Published when a ride is requested in Fast.",
   "fields": [
     { "name": "eventId", "type": "string" },
     { "name": "eventVersion", "type": "int", "default": 1 },

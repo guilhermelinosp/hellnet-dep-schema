@@ -96,11 +96,25 @@ schemas/
 
 ## Schema naming convention
 
+Non-Fast schemas use the existing generic convention:
+
 ```
 hellnet-{domain}-{event}
 ```
 
 Examples: `hellnet-order-created`, `hellnet-invoice-paid`, `hellnet-stock-updated`
+
+Fast Avro schemas use the event contract convention below. The domain is the
+first segment after `fast-`; the event is the remaining hyphen-separated text.
+
+```
+schema name: fast-{domain}-{event}
+namespace:   fast.events.{domain}.v{version}
+record name: {EventName}V{version}
+```
+
+For example, `fast-ride-requested` v1 uses namespace
+`fast.events.ride.v1` and record name `RideRequestedV1`.
 
 ## Git tags
 
