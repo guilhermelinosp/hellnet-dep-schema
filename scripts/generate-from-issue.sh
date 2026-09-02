@@ -67,16 +67,51 @@ validate_json_file() {
 # === Generator: Avro ===
 
 generate_avro() {
-  local name="$1" fields="$2" output="$3"
-  local avro_name
-  avro_name=$(echo "$name" | tr '-' '_' | sed 's/[^a-zA-Z0-9_]/_/g')
+  local name="$1" fields="$2" output="$3" version="$4"
+  local fast_name domain event avro_name namespace doc
+
+  # Fast Avro names are deliberately stricter than the shared JSON/Protobuf
+  # name validation: the name is part of the public contract.
+  if [[ ! "$name" =~ ^fast-[a-z0-9]+-[a-z0-9]+([a-z0-9-]*[a-z0-9])?$ ]]; then
+    echo "ERROR: invalid Fast Avro schema name (expected fast-{domain}-{event}): $name" >&2
+    exit 1
+  fi
+  fast_name="${name#fast-}"
+  domain="${fast_name%%-*}"
+  event="${fast_name#*-}"
+  if [ -z "$domain" ] || [ -z "$event" ] || [[ "$event" == *--* ]]; then
+    echo "ERROR: invalid Fast Avro schema name (domain/event must be non-empty): $name" >&2
+    exit 1
+  fi
+
+  avro_name=$(printf '%s\n' "${domain}-${event}" | awk -F- '{for (i = 1; i <= NF; i++) $i = toupper(substr($i, 1, 1)) substr($i, 2)}1' | tr -d ' ')
+  avro_name="${avro_name}V${version}"
+  namespace="fast.events.${domain}.v${version}"
+  case "${domain}-${event}" in
+    ride-requested) doc="Published when a ride is requested in Fast." ;;
+    ride-accepted) doc="Published when a driver accepts a ride in Fast." ;;
+    ride-completed) doc="Published when a ride is completed in Fast." ;;
+    ride-cancelled|ride-canceled) doc="Published when a ride is cancelled in Fast." ;;
+    payment-requested) doc="Published when payment is requested for a ride in Fast." ;;
+    payment-authorized) doc="Published when payment is authorized for a ride in Fast." ;;
+    payment-captured) doc="Published when payment is captured for a ride in Fast." ;;
+    payment-failed) doc="Published when payment fails for a ride in Fast." ;;
+    payment-refunded) doc="Published when payment is refunded for a ride in Fast." ;;
+    driver-registered) doc="Published when a driver is registered in Fast." ;;
+    driver-available) doc="Published when a driver becomes available in Fast." ;;
+    driver-unavailable) doc="Published when a driver becomes unavailable in Fast." ;;
+    driver-location-updated) doc="Published when a driver's location is updated in Fast." ;;
+    *)
+      doc="Published when ${event//-/ } occurs in ${domain} in Fast."
+      ;;
+  esac
 
   exec 3>"$output"
   echo '{' >&3
-  echo '  "namespace": "hellnet.events",' >&3
+  echo "  \"namespace\": \"$namespace\"," >&3
   echo '  "type": "record",' >&3
   echo "  \"name\": \"$avro_name\"," >&3
-  echo '  "doc": "Auto-generated from hellnet-dep-schema",' >&3
+  echo "  \"doc\": \"$doc\"," >&3
   echo '  "fields": [' >&3
 
   local first=true
@@ -220,7 +255,7 @@ mkdir -p "$SCHEMA_DIR/v${VERSION}"
 
 case "$TYPE" in
   avro)
-    generate_avro "$NAME" "$FIELDS" "$SCHEMA_DIR/v${VERSION}/schema.avsc"
+    generate_avro "$NAME" "$FIELDS" "$SCHEMA_DIR/v${VERSION}/schema.avsc" "$VERSION"
     ;;
   json)
     generate_json "$NAME" "$FIELDS" "$SCHEMA_DIR/v${VERSION}/schema.json"

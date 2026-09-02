@@ -1,8 +1,8 @@
 {
-  "namespace": "hellnet.events",
+  "namespace": "fast.events.ride.v1",
   "type": "record",
-  "name": "fast_ride_accepted",
-  "doc": "Auto-generated from hellnet-dep-schema",
+  "name": "RideAcceptedV1",
+  "doc": "Published when a driver accepts a ride in Fast.",
   "fields": [
     { "name": "eventId", "type": "string" },
     { "name": "eventVersion", "type": "int", "default": 1 },
