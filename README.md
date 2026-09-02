@@ -169,6 +169,46 @@ schema/hellnet-stock-updated/v1
   --schema schemas/avro/hellnet-order-created/v1
 ```
 
+### Redpanda Schema Registry
+
+The repository contains contracts, not event payloads. This script registers Avro
+schemas only; it never publishes fake messages. Topic creation is opt-in and does
+not publish events.
+
+Prerequisites: `python3` and `curl`. `rpk` is optional and is used only with
+`--apply --create-topics`.
+
+```bash
+# Safe default: no network writes (REDPANDA_SCHEMA_REGISTRY_URL defaults to
+# http://localhost:8081; REDPANDA_BROKERS defaults to localhost:9092).
+bash scripts/register-redpanda.sh --dry-run
+
+# Register schemas (does not create topics or publish messages).
+bash scripts/register-redpanda.sh --apply --registry http://localhost:8081
+
+# Register and, only when rpk is installed, create the derived topics.
+bash scripts/register-redpanda.sh --apply --create-topics
+```
+
+The endpoint is the Confluent-compatible Redpanda API:
+`POST /subjects/{subject}/versions`, with content type
+`application/vnd.schemaregistry.v1+json` and a JSON body whose `schema` value is
+the complete Avro document. The stable mapping intentionally keeps subjects and
+topics distinct:
+
+| Schema directory | Subject | Topic |
+|---|---|---|
+| `fast-ride-requested/v1` | `fast-ride-requested-value` | `ride.requested.v1` |
+| `fast-ride-accepted/v1` | `fast-ride-accepted-value` | `ride.accepted.v1` |
+
+Only directories matching `fast-{domain}-{event}` are accepted. Event names may
+contain additional hyphen-separated words, which become dot-separated topic
+segments. A dry-run prints the schema, subject, endpoint, and topic without a
+write. Registration is idempotent: submitting the same schema to the same
+subject lets the registry deduplicate it. Schema Registry synchronization is
+separate from publishing events; applications publish real payloads later using
+the registered contracts.
+
 ## Related repos
 
 | Repo | Purpose |
