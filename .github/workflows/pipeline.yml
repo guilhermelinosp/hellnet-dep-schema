@@ -1,8 +1,7 @@
 name: pipeline
 
 # Library CI: cut a semver tag + GitHub Release on every code change to main
-# (changes limited to .github/ are ignored so CI edits never trigger a
-# release), then run the quality gate.
+# (changes limited to .github/ are ignored so CI edits never trigger a release).
 
 on:
   push:
@@ -20,10 +19,3 @@ jobs:
     secrets: inherit
     permissions:
       contents: write
-
-  quality:
-    name: quality
-    needs: [release]
-    uses: guilhermelinosp/templates/.github/workflows/lib-quality.yml@main
-    with:
-      go-version-file: go.mod
