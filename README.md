@@ -200,10 +200,7 @@ topics distinct:
 |---|---|---|
 | `fast-ride-requested/v1` | `fast-ride-requested` | `ride.requested.v1` |
 | `fast-ride-accepted/v1` | `fast-ride-accepted` | `ride.accepted.v1` |
-
-Subjects ending in `-value` are legacy subjects from the previous mapping. This
-change does not delete them; remove those legacy subjects separately after
-migration and validation of all consumers.
+| `hellnet-order-created/v1` | `hellnet-order-created` | `hellnet.order.created.v1` |
 
 Only directories matching `fast-{domain}-{event}` are accepted. Event names may
 contain additional hyphen-separated words, which become dot-separated topic
