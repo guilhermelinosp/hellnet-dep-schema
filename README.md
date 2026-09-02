@@ -200,6 +200,7 @@ topics distinct:
 |---|---|---|
 | `fast-ride-requested/v1` | `fast-ride-requested` | `ride.requested.v1` |
 | `fast-ride-accepted/v1` | `fast-ride-accepted` | `ride.accepted.v1` |
+| `hellnet-order-created/v1` | `hellnet-order-created` | `hellnet.order.created.v1` |
 
 Only directories matching `fast-{domain}-{event}` are accepted. Event names may
 contain additional hyphen-separated words, which become dot-separated topic
