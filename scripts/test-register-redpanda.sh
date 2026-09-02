@@ -6,20 +6,20 @@ SCRIPT="$SCRIPT_DIR/register-redpanda.sh"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-mkdir -p "$TMP_DIR/schemas/avro/fast-ride-requested/v1" "$TMP_DIR/schemas/avro/fast-ride-accepted/v2"
+mkdir -p "$TMP_DIR/schemas/avro/fast-ride-requested/v1" "$TMP_DIR/schemas/avro/fast-ride-accepted/v1"
 cat > "$TMP_DIR/schemas/avro/fast-ride-requested/v1/schema.avsc" <<'EOF'
 {"namespace":"fast.events.ride.v1","type":"record","name":"RideRequestedV1","fields":[]}
 EOF
-cat > "$TMP_DIR/schemas/avro/fast-ride-accepted/v2/schema.avsc" <<'EOF'
-{"namespace":"fast.events.ride.v2","type":"record","name":"RideAcceptedV2","fields":[]}
+cat > "$TMP_DIR/schemas/avro/fast-ride-accepted/v1/schema.avsc" <<'EOF'
+{"namespace":"fast.events.ride.v1","type":"record","name":"RideAcceptedV1","fields":[]}
 EOF
 
 output=$(SCHEMAS_DIR="$TMP_DIR/schemas/avro" bash "$SCRIPT" --dry-run)
-[[ "$output" == *"subject=fast-ride-requested-value"* ]]
+[[ "$output" == *"subject=fast-ride-requested"* ]]
 [[ "$output" == *"topic=ride.requested.v1"* ]]
-[[ "$output" == *"subject=fast-ride-accepted-value"* ]]
-[[ "$output" == *"topic=ride.accepted.v2"* ]]
-[[ "$output" == *"endpoint=http://localhost:8081/subjects/fast-ride-requested-value/versions"* ]]
+[[ "$output" == *"subject=fast-ride-accepted"* ]]
+[[ "$output" == *"topic=ride.accepted.v1"* ]]
+[[ "$output" == *"endpoint=http://localhost:8081/subjects/fast-ride-requested/versions"* ]]
 
 mkdir -p "$TMP_DIR/schemas/avro/not-fast/v1"
 printf '%s\n' '{"type":"record","name":"Bad","namespace":"bad","fields":[]}' \
