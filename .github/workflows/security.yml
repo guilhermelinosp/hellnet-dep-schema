@@ -38,10 +38,10 @@ jobs:
         run: go vet ./...
 
       - name: Semgrep
-        uses: semgrep/semgrep@v1
+        uses: semgrep/semgrep-action@v1
         with:
           # public community CI ruleset (no SEMGREP_APP_TOKEN required)
-          args: --config p/ci --error
+          config: p/ci
 
       - name: GoSec
         if: hashFiles('go.mod') != ''
