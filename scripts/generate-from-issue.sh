@@ -3,13 +3,33 @@ set -euo pipefail
 
 # === Helpers ===
 
+# Extract the non-empty content of an Issue Form section. Issue Forms render
+# an empty line between a heading and its value, and may add more empty lines
+# inside a multiline field, so parsing must be heading-delimited rather than
+# based on the line immediately following the heading.
+extract_section() {
+  local body="$1" section="$2"
+  printf '%s\n' "$body" | awk -v section="$section" '
+    /^### / {
+      in_section = ($0 == "### " section)
+      next
+    }
+    in_section && NF { print }
+  '
+}
+
+extract_value() {
+  extract_section "$1" "$2" | awk 'NF { print; exit }' | xargs
+}
+
 # Parse issue body fields from GitHub issue template
 parse_issue_body() {
   local body="$1"
-  NAME=$(echo "$body" | sed -n '/### Schema name/{n;p;}' | xargs)
-  TYPE=$(echo "$body" | sed -n '/### Format/{n;p;}' | xargs)
-  COMPAT=$(echo "$body" | sed -n '/### Compatibility/{n;p;}' | xargs)
-  FIELDS=$(echo "$body" | sed -n '/### Fields/,/### [A-Z]/p' | sed '1d;$d' | grep -v '^$')
+  NAME=$(extract_value "$body" "Schema name")
+  TYPE=$(extract_value "$body" "Format")
+  COMPAT=$(extract_value "$body" "Compatibility level")
+  FIELDS=$(extract_section "$body" "Fields (YAML)" |
+    sed '/^[[:space:]]*```[[:alnum:]_-]*[[:space:]]*$/d;/^[[:space:]]*$/d')
 
   NAME="${NAME:-unknown}"
   TYPE="${TYPE:-avro}"
@@ -67,12 +87,17 @@ generate_avro() {
     first=false
 
     echo -n '    { "name": "'"$fname"'", "type": ' >&3
-    if [ "$frequired" = "false" ] || [ -n "$fdefault" ]; then
+    if [ "$frequired" = "false" ]; then
       echo -n '["null", "'"$ftype"'"]' >&3
+      if [ -n "$fdefault" ]; then
+        echo -n ', "default": '"$fdefault" >&3
+      else
+        echo -n ', "default": null' >&3
+      fi
     else
       echo -n '"'"$ftype"'"' >&3
+      [ -n "$fdefault" ] && echo -n ', "default": '"$fdefault" >&3
     fi
-    [ -n "$fdefault" ] && echo -n ', "default": '"$fdefault" >&3
     echo -n ' }' >&3
   done < <(parse_fields "$fields")
 
@@ -174,6 +199,10 @@ fi
 case "$TYPE" in
   avro|json|protobuf) ;;
   *) echo "ERROR: invalid schema type (allowed: avro|json|protobuf): $TYPE"; exit 1 ;;
+esac
+case "$COMPAT" in
+  BACKWARD|FORWARD|FULL|NONE) ;;
+  *) echo "ERROR: invalid compatibility level (allowed: BACKWARD|FORWARD|FULL|NONE): $COMPAT"; exit 1 ;;
 esac
 
 VERSION=1

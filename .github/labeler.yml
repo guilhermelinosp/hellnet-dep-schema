@@ -1,0 +1,16 @@
+"github_actions":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - ".gitignore"
+
+"docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+
+"schema":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "schemas/**"
+          - "scripts/**"
