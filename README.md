@@ -198,8 +198,8 @@ topics distinct:
 
 | Schema directory | Subject | Topic |
 |---|---|---|
-| `fast-ride-requested/v1` | `fast-ride-requested-value` | `ride.requested.v1` |
-| `fast-ride-accepted/v1` | `fast-ride-accepted-value` | `ride.accepted.v1` |
+| `fast-ride-requested/v1` | `fast-ride-requested` | `ride.requested.v1` |
+| `fast-ride-accepted/v1` | `fast-ride-accepted` | `ride.accepted.v1` |
 
 Only directories matching `fast-{domain}-{event}` are accepted. Event names may
 contain additional hyphen-separated words, which become dot-separated topic

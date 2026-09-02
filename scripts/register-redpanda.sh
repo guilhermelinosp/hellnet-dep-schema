@@ -82,13 +82,14 @@ if not isinstance(namespace, str) or not namespace:
     raise SystemExit(f"{path} has no namespace")
 if not isinstance(record_name, str) or not record_name:
     raise SystemExit(f"{path} has no record name")
-if not re.fullmatch(r"fast-[a-z0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*", directory_name):
-    raise SystemExit(
-        f"Unsupported schema directory {directory_name!r}; expected fast-{{domain}}-{{event}}"
-    )
-domain, event = directory_name.removeprefix("fast-").split("-", 1)
-subject = f"{directory_name}-value"
-topic = f"{domain}.{event.replace('-', '.')}.v{version}"
+if re.fullmatch(r"fast-[a-z0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*", directory_name):
+    domain, event = directory_name.removeprefix("fast-").split("-", 1)
+    subject = directory_name
+    topic = f"{domain}.{event.replace('-', '.')}.v{version}"
+else:
+    # Legacy schema: use directory name as subject, derive topic from name
+    subject = directory_name
+    topic = f"{directory_name.replace('-', '.')}.v{version}"
 print("\t".join((namespace, record_name, directory_name, version, subject, topic)))
 PY
   )
