@@ -1,4 +1,5 @@
 name: process-schema-issue
+
 on:
   workflow_dispatch:
   issues:
@@ -20,7 +21,7 @@ jobs:
       branch: ${{ steps.branch.outputs.name }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -32,10 +33,10 @@ jobs:
           chmod +x scripts/generate-from-issue.sh
           result=$(./scripts/generate-from-issue.sh "$ISSUE_BODY")
           echo "$result"
-          echo "name=$(echo "$result" | grep '^NAME=' | cut -d= -f2)" >> $GITHUB_OUTPUT
-          echo "type=$(echo "$result" | grep '^TYPE=' | cut -d= -f2)" >> $GITHUB_OUTPUT
-          echo "version=$(echo "$result" | grep '^VERSION=' | cut -d= -f2)" >> $GITHUB_OUTPUT
-          echo "path=$(echo "$result" | grep '^PATH=' | cut -d= -f2)" >> $GITHUB_OUTPUT
+          echo "name=$(echo "$result" | grep '^NAME=' | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "type=$(echo "$result" | grep '^TYPE=' | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "version=$(echo "$result" | grep '^VERSION=' | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "path=$(echo "$result" | grep '^PATH=' | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Create branch
         id: branch
@@ -51,7 +52,7 @@ jobs:
           git commit -m "feat(schema): ${SCHEMA_NAME} v${SCHEMA_VERSION}"
           git tag --force "schema/${SCHEMA_NAME}/v${SCHEMA_VERSION}"
           git push origin "$branch" --follow-tags --force
-          echo "name=$branch" >> $GITHUB_OUTPUT
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
 
       - name: Open PR
         env:
@@ -60,6 +61,7 @@ jobs:
           SCHEMA_VERSION: ${{ steps.generate.outputs.version }}
           BRANCH_NAME: ${{ steps.branch.outputs.name }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           gh pr create \
             --base main \
@@ -67,15 +69,16 @@ jobs:
             --title "schema: ${SCHEMA_NAME} v${SCHEMA_VERSION}" \
             --body "Schema generated from issue #${ISSUE_NUMBER}" \
             --label schema \
-            --repo ${{ github.repository }}
+            --repo "$REPO"
 
       - name: Close issue with PR reference
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ steps.branch.outputs.name }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           pr_url=$(gh pr list --head "$BRANCH_NAME" --json url -q '.[0].url')
           gh issue close "$ISSUE_NUMBER" \
             --comment "Schema generated in PR: ${pr_url}" \
-            --repo ${{ github.repository }}
+            --repo "$REPO"
