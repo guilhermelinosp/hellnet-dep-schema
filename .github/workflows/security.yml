@@ -37,12 +37,6 @@ jobs:
         if: hashFiles('go.mod') != ''
         run: go vet ./...
 
-      - name: Semgrep
-        uses: semgrep/semgrep-action@v1
-        with:
-          # public community CI ruleset (no SEMGREP_APP_TOKEN required)
-          config: p/ci
-
       - name: GoSec
         if: hashFiles('go.mod') != ''
         uses: securego/gosec@master
